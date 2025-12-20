@@ -141,7 +141,7 @@ func ListHolesByDivision(c *fiber.Ctx) error {
 	if id != 0 {
 		querySet = querySet.Where("hole.division_id = ?", id)
 	}
-	err = querySet.Find(&holes)
+	err = querySet.Find(&holes).Error
 
 	if (err != nil){
 		return err;
@@ -192,7 +192,7 @@ func ListSFWHolesByDivision(c *fiber.Ctx) error {
 			Where("tag.nsfw = ?", true).
 			Select("hole_tags.hole_id"))
 
-	err = querySet.Find(&holes)
+	err = querySet.Find(&holes).Error
 	if (err !=  nil){
 		return err
 	}
