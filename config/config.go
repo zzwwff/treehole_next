@@ -64,6 +64,7 @@ var Config struct {
 	SummaryReplyBoundary3        int      `env:"SUMMARY_REPLY_BOUNDARY_1" envDefault:"1000"`
 	SummaryLogLimit              int      `env:"SUMMARY_LOG_LIMIT" envDefault:"1000"`
 	WhiteListUserIds             []int    `env:"WHITE_LIST_USER_IDS"`
+	WhiteListRate                float32  `env:"WHITE_LIST_RATE" envDefault:"1"`
 	MaxSummaryFloors             int      `env:"MAX_FLOORS_PER_HOLE" envDefault:"50"`
 }
 

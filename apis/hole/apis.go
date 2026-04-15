@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"math/rand"
 	"net/http"
@@ -955,10 +956,14 @@ func DeleteHole(c *fiber.Ctx) error {
 func GenerateSummary(c *fiber.Ctx) error {
 	uid, _ := common.GetUserID(c)
 	if config.Config.WhiteListUserIds != nil && !slices.Contains(config.Config.WhiteListUserIds, uid) {
-		return c.Status(404).JSON(fiber.Map{
-			"code":    404,
-			"message": "Cannot GET " + c.Path(),
-		})
+		h := fnv.New32a()
+		h.Write([]byte(strconv.Itoa(uid)))
+		if int(h.Sum32())%100 >= int(100*config.Config.WhiteListRate) {
+			return c.Status(404).JSON(fiber.Map{
+				"code":    404,
+				"message": "Cannot GET " + c.Path(),
+			})
+		}
 	}
 	id, _ := c.ParamsInt("id")
 	forceRefresh := c.QueryBool("force_refresh")
