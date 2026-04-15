@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 package claw
 
 const (
@@ -78,8 +79,16 @@ const (
     ErrCodeInternal       = "SYS_001"
     ErrCodeProcessFailed  = "CLAW_001"
 )
+=======
+package division
+
+>>>>>>> 4a7a1da (Add test function)
 
 type OpenClawTest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 4a7a1da (Add test function)

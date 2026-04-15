@@ -1,8 +1,15 @@
+<<<<<<< HEAD
 package claw
 
 import (
 	"strconv"
     "time"
+=======
+package division
+
+import (
+	"strconv"
+>>>>>>> 4a7a1da (Add test function)
 
 	"github.com/goccy/go-json"
 	"gorm.io/gorm"
@@ -14,11 +21,17 @@ import (
 	. "treehole_next/utils"
 
 	"github.com/gofiber/fiber/v2"
+<<<<<<< HEAD
 	"github.com/gofiber/contrib/websocket"
     "github.com/rs/zerolog/log"
 )
 
 // clawtest
+=======
+)
+
+// Test
+>>>>>>> 4a7a1da (Add test function)
 //
 // @Summary Temporary Test for openclaw
 // @Tags claw
@@ -27,7 +40,11 @@ import (
 // @Router /test [post]
 // @Param json body CreateModel true "json"
 // @Failure 404 {object} MessageModel
+<<<<<<< HEAD
 func clawtest(c *fiber.Ctx) error {
+=======
+func AddDivision(c *fiber.Ctx) error {
+>>>>>>> 4a7a1da (Add test function)
 	// validate body
 	var body OpenClawTest
 	err := common.ValidateBody(c, &body)
@@ -49,6 +66,7 @@ func clawtest(c *fiber.Ctx) error {
 	
 	return common.BadRequest("The path forward is leaved for further exploration.")
 }
+<<<<<<< HEAD
 
 
 // HandleWebSocket WebSocket连接主处理函数
@@ -193,3 +211,5 @@ func sendError(c *websocket.Conn, code string, errMsg string, messageID string, 
         log.Err(err).Msgf("[Claw] Write error message failed: %v", err)
     }
 }
+=======
+>>>>>>> 4a7a1da (Add test function)
