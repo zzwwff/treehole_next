@@ -30,8 +30,7 @@ import (
 =======
 )
 
-// Test
->>>>>>> 4a7a1da (Add test function)
+// clawtest
 //
 // @Summary Temporary Test for openclaw
 // @Tags claw
@@ -40,11 +39,7 @@ import (
 // @Router /test [post]
 // @Param json body CreateModel true "json"
 // @Failure 404 {object} MessageModel
-<<<<<<< HEAD
-func clawtest(c *fiber.Ctx) error {
-=======
 func AddDivision(c *fiber.Ctx) error {
->>>>>>> 4a7a1da (Add test function)
 	// validate body
 	var body OpenClawTest
 	err := common.ValidateBody(c, &body)
