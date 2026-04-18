@@ -43,8 +43,8 @@ type ErrorMessage struct {
 // Media 媒体信息（暂时留空）
 type Media struct{}
 
-// Message 业务消息
-type Message struct {
+// ClawMessage 业务消息
+type ClawMessage struct {
     Type      string      `json:"type"`
     From      string      `json:"from"`
     Content   string      `json:"content"`

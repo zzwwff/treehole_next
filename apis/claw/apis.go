@@ -1,17 +1,13 @@
 package claw
 
 import (
-	"strconv"
     "time"
 
 	"github.com/goccy/go-json"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/opentreehole/go-common"
 
 	. "treehole_next/models"
-	. "treehole_next/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/contrib/websocket"
@@ -28,7 +24,7 @@ import (
 // @Router /test [post]
 // @Param json body CreateModel true "json"
 // @Failure 404 {object} MessageModel
-func AddDivision(c *fiber.Ctx) error {
+func clawtest(c *fiber.Ctx) error {
 	// validate body
 	var body OpenClawTest
 	err := common.ValidateBody(c, &body)
@@ -143,7 +139,7 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 
 // handleMessage 处理业务消息
 func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
-    var msg Message
+    var msg ClawMessage
     if err := json.Unmarshal(rawMsg, &msg); err != nil {
         sendError(c, ErrCodeUnknownType, "消息格式错误", "", 0)
         return
@@ -162,7 +158,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 
     //TO DO: 实际业务逻辑
     // 暂时直接返回 hello world
-    resp := Message{
+    resp := ClawMessage{
         Type:      MessageTypeMessage,
         From:      "server",
         Content:   "hello world",

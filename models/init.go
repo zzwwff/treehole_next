@@ -153,7 +153,6 @@ func InitDB() {
 		&UserFavorite{},
 		&FavoriteGroup{},
 		&UrlHostnameBlacklist{},
-		&UrlHostnameWhitelist{},
 		&ClawSession{},
 	)
 	if err != nil {
