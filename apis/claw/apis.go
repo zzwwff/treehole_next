@@ -1,4 +1,4 @@
-package division
+package claw
 
 import (
 	"strconv"

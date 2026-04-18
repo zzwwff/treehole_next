@@ -13,6 +13,7 @@ import (
 	"treehole_next/apis/subscription"
 	"treehole_next/apis/tag"
 	"treehole_next/apis/user"
+	"treehole_next/apis/claw"
 	"treehole_next/config"
 	_ "treehole_next/docs"
 	"treehole_next/models"
@@ -47,6 +48,7 @@ func RegisterRoutes(app *fiber.App) {
 	penalty.RegisterRoutes(group)
 	user.RegisterRoutes(group)
 	message.RegisterRoutes(group)
+	claw.RegisterRoutes(group)
 }
 
 func MiddlewareGetUser(c *fiber.Ctx) error {

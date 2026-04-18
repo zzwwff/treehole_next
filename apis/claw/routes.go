@@ -1,4 +1,4 @@
-package division
+package claw
 
 import "github.com/gofiber/fiber/v2"
 
