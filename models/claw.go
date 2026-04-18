@@ -11,7 +11,7 @@ type ClawSession struct {
 	ID           uint      `json:"id" gorm:"primaryKey"`
 	UserID       int       `json:"user_id" gorm:"index"`
 	Conversation string    `json:"conversation"`                     // 用户自定义的会话名称
-	OC_SessionID string    `json:"oc_session_id" gorm:"uniqueIndex"` // OpenClaw 生成的 session ID
+	OC_SessionID string    `json:"oc_session_id" gorm:"type:varchar(191);not null;uniqueIndex"` // OpenClaw 生成的 session ID
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
