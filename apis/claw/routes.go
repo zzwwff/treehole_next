@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 package claw
 
 import (
@@ -21,12 +20,3 @@ func RegisterRoutes(app fiber.Router) {
 	app.Post("/claw/test", clawtest)
 
 }
-=======
-package division
-
-import "github.com/gofiber/fiber/v2"
-
-func RegisterRoutes(app fiber.Router) {
-	app.Post("/test", clawtest)
-}
->>>>>>> 4a7a1da (Add test function)

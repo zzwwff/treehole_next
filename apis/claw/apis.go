@@ -1,15 +1,8 @@
-<<<<<<< HEAD
 package claw
 
 import (
 	"strconv"
     "time"
-=======
-package division
-
-import (
-	"strconv"
->>>>>>> 4a7a1da (Add test function)
 
 	"github.com/goccy/go-json"
 	"gorm.io/gorm"
@@ -21,14 +14,10 @@ import (
 	. "treehole_next/utils"
 
 	"github.com/gofiber/fiber/v2"
-<<<<<<< HEAD
 	"github.com/gofiber/contrib/websocket"
     "github.com/rs/zerolog/log"
 )
 
-// clawtest
-=======
-)
 
 // clawtest
 //
@@ -61,7 +50,6 @@ func AddDivision(c *fiber.Ctx) error {
 	
 	return common.BadRequest("The path forward is leaved for further exploration.")
 }
-<<<<<<< HEAD
 
 
 // HandleWebSocket WebSocket连接主处理函数
@@ -206,5 +194,3 @@ func sendError(c *websocket.Conn, code string, errMsg string, messageID string, 
         log.Err(err).Msgf("[Claw] Write error message failed: %v", err)
     }
 }
-=======
->>>>>>> 4a7a1da (Add test function)
