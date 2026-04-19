@@ -11,6 +11,7 @@ func TestCreateSession(t *testing.T) {
 	session, err := CreateSession(DB, 1, "测试会话", "oc-123")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, session.UserID)
+	assert.Greater(t, session.UserSessionID, 0)
 	assert.Equal(t, "测试会话", session.Conversation)
 	assert.Equal(t, "oc-123", session.OC_SessionID)
 }
@@ -22,6 +23,15 @@ func TestGetSessionsByUserID(t *testing.T) {
 	sessions, err := GetSessionsByUserID(DB, 2)
 	assert.NoError(t, err)
 	assert.Len(t, sessions, 2)
+}
+
+func TestUserSessionIDAutoIncrement(t *testing.T) {
+	s1, err := CreateSession(DB, 1000, "第一会话", "oc-u1000-1")
+	assert.NoError(t, err)
+
+	s2, err := CreateSession(DB, 1000, "第二会话", "oc-u1000-2")
+	assert.NoError(t, err)
+	assert.Equal(t, s1.UserSessionID+1, s2.UserSessionID)
 }
 
 func TestGetSessionByOCID(t *testing.T) {

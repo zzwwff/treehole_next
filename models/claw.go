@@ -8,12 +8,13 @@ import (
 
 // ClawSession OpenClaw 会话表
 type ClawSession struct {
-	ID           uint      `json:"id" gorm:"primaryKey"`
-	UserID       int       `json:"user_id" gorm:"index"`
-	Conversation string    `json:"conversation"`                     // 用户自定义的会话名称
-	OC_SessionID string    `json:"oc_session_id" gorm:"type:varchar(191);not null;uniqueIndex"` // OpenClaw 生成的 session ID
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID            uint      `json:"id" gorm:"primaryKey"`
+	UserID        int       `json:"user_id" gorm:"index:idx_claw_user_session,priority:1"`
+	UserSessionID int       `json:"user_session_id" gorm:"not null;uniqueIndex:idx_claw_user_session,priority:2"`
+	Conversation  string    `json:"conversation"`                     // 用户自定义的会话名称
+	OC_SessionID  string    `json:"oc_session_id" gorm:"type:varchar(191);not null;uniqueIndex"` // OpenClaw 生成的 session ID
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 func (ClawSession) TableName() string {
@@ -27,6 +28,25 @@ func GetSessionsByUserID(tx *gorm.DB, userID int) ([]ClawSession, error) {
 	return data, err
 }
 
+// GetSessionCountByUserID 获取用户会话总数
+func GetSessionCountByUserID(tx *gorm.DB, userID int) (int64, error) {
+	var count int64
+	err := tx.Model(&ClawSession{}).
+		Where("user_id = ?", userID).
+		Count(&count).Error
+	return count, err
+}
+
+// GetSessionByUserAndSessionID 通过用户ID和用户内会话ID查询
+func GetSessionByUserAndSessionID(tx *gorm.DB, userID int, userSessionID int) (*ClawSession, error) {
+	var session ClawSession
+	err := tx.Where("user_id = ? AND user_session_id = ?", userID, userSessionID).First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
 // GetSessionByOCID 通过 OpenClaw SessionID 查询
 func GetSessionByOCID(tx *gorm.DB, ocSessionID string) (*ClawSession, error) {
 	var session ClawSession
@@ -38,13 +58,31 @@ func GetSessionByOCID(tx *gorm.DB, ocSessionID string) (*ClawSession, error) {
 }
 
 // CreateSession 创建新会话
-func CreateSession(tx *gorm.DB, userID int, conversation string, ocSessionID string) (*ClawSession, error) {
-	session := &ClawSession{
-		UserID:       userID,
-		Conversation: conversation,
-		OC_SessionID: ocSessionID,
+func getNextUserSessionID(tx *gorm.DB, userID int) (int, error) {
+	var maxID int64
+	err := tx.Model(&ClawSession{}).
+		Where("user_id = ?", userID).
+		Select("COALESCE(MAX(user_session_id), 0)").
+		Scan(&maxID).Error
+	if err != nil {
+		return 0, err
 	}
-	err := tx.Create(session).Error
+	return int(maxID) + 1, nil
+}
+
+func CreateSession(tx *gorm.DB, userID int, conversation string, ocSessionID string) (*ClawSession, error) {
+	userSessionID, err := getNextUserSessionID(tx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	session := &ClawSession{
+		UserID:        userID,
+		UserSessionID: userSessionID,
+		Conversation:  conversation,
+		OC_SessionID:  ocSessionID,
+	}
+	err = tx.Create(session).Error
 	return session, err
 }
 

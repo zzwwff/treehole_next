@@ -1,6 +1,7 @@
 package claw
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -12,6 +13,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 // clawtest
@@ -129,14 +131,21 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		return
 	}
 
+	count, err := GetSessionCountByUserID(DB, user.ID)
+	if err != nil {
+		log.Err(err).Msg("[Claw] count sessions failed")
+		sendError(c, ErrCodeAuthFailed, "认证失败，请稍后重试", "", 0)
+		return
+	}
+
 	client.IsAuthed = true
 	client.UserID = user.ID
-	client.ChannelCount = 0
+	client.ChannelCount = int(count)
 
 	resp := AuthSuccessMessage{
 		Type:         MessageTypeAuthSuccess,
 		Timestamp:    time.Now().UnixMilli(),
-		ChannelCount: client.UserID, // 这里暂时用UserID模拟ChannelCount，实际业务中应替换为正确的值
+		ChannelCount: int(count),
 		Version:      "1.0",
 	}
 
@@ -164,6 +173,32 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		return
 	}
 
+	var channelID int
+	if msg.ChannelID == 0 {
+		// 创建新会话
+		ocSessionID := fmt.Sprintf("oc-%d-%d", client.UserID, time.Now().UnixMilli())
+		session, err := CreateSession(DB, client.UserID, "新会话", ocSessionID)
+		if err != nil {
+			log.Err(err).Msg("[Claw] create session failed")
+			sendError(c, ErrCodeInternal, "创建会话失败", msg.MessageID, 0)
+			return
+		}
+		channelID = session.UserSessionID
+	} else {
+		// 检查会话是否存在
+		_, err := GetSessionByUserAndSessionID(DB, client.UserID, msg.ChannelID)
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				sendError(c, ErrCodeUnknownType, "会话不存在", msg.MessageID, msg.ChannelID)
+			} else {
+				log.Err(err).Msg("[Claw] get session failed")
+				sendError(c, ErrCodeInternal, "查询会话失败", msg.MessageID, msg.ChannelID)
+			}
+			return
+		}
+		channelID = msg.ChannelID
+	}
+
 	//TO DO: 实际业务逻辑
 	// 暂时直接返回 hello world
 	resp := ClawMessage{
@@ -171,7 +206,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		From:      "server",
 		Content:   "hello world",
 		MessageID: msg.MessageID, // 回传客户端的消息ID
-		ChannelID: msg.ChannelID,
+		ChannelID: channelID,
 		Timestamp: time.Now().UnixMilli(),
 		Media:     Media{},
 		Version:   "1.0",
@@ -179,7 +214,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 
 	if err := c.WriteJSON(resp); err != nil {
 		log.Err(err).Msgf("[Claw] Write message error: %v", err)
-		sendError(c, ErrCodeInternal, "发送消息失败", msg.MessageID, msg.ChannelID)
+		sendError(c, ErrCodeInternal, "发送消息失败", msg.MessageID, channelID)
 	}
 }
 
