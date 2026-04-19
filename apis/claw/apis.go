@@ -110,22 +110,33 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		return
 	}
 
-	//TO DO: 加入鉴权认证逻辑
+	// 解析并校验 JWT token
+	user := &User{BanDivision: make(map[int]*time.Time)}
+	if err := common.ParseJWTToken(authMsg.Token, user); err != nil {
+		sendError(c, ErrCodeAuthFailed, "token 解析失败，请重新登录", "", 0)
+		return
+	}
 
-	// 暂时硬编码，后续替换
-	userID := 1
-	channelCount := 0
+	if user.ID == 0 {
+		sendError(c, ErrCodeAuthFailed, "token 中未包含合法用户信息", "", 0)
+		return
+	}
 
-	// 更新客户端状态
+	// 从数据库加载用户完整信息
+	if err := user.LoadUserByID(user.ID); err != nil {
+		log.Err(err).Msg("[Claw] load user failed")
+		sendError(c, ErrCodeAuthFailed, "认证失败，请稍后重试", "", 0)
+		return
+	}
+
 	client.IsAuthed = true
-	client.UserID = userID
-	client.ChannelCount = channelCount
+	client.UserID = user.ID
+	client.ChannelCount = 0
 
-	// 返回认证成功
 	resp := AuthSuccessMessage{
 		Type:         MessageTypeAuthSuccess,
 		Timestamp:    time.Now().UnixMilli(),
-		ChannelCount: channelCount,
+		ChannelCount: client.UserID, // 这里暂时用UserID模拟ChannelCount，实际业务中应替换为正确的值
 		Version:      "1.0",
 	}
 
