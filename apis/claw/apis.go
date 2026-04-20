@@ -9,7 +9,7 @@ import (
 	"github.com/opentreehole/go-common"
 
 	. "treehole_next/models"
-
+	
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -45,6 +45,34 @@ func clawtest(c *fiber.Ctx) error {
 	}
 
 	return common.BadRequest("The path forward is leaved for further exploration.")
+}
+
+// ListChannels
+//
+// @Summary List Users' all channels
+// @Tags Claw
+// @Produce application/json
+// @Router /claw/channels [get]
+// @Success 200 {array} ClawSession
+func ListChannels(c *fiber.Ctx) error {
+	// get user
+	user, err := GetCurrLoginUser(c)
+	if err != nil {
+		return err
+	}
+
+	sessions, err := GetSessionsByUserID(DB, user.UserID)
+	if err != nil {
+		log.Err(err).Msg("[Claw] get sessions failed")
+		return common.BadRequest("获取对话列表失败")
+	}
+	for _, session := range sessions {
+		(*session).OC_SessionID = ""
+		(*session).ID = 0
+		(*session).UserID = 0
+		(*session).Conversation = ""
+	}
+	return c.JSON(sessions)
 }
 
 // HandleWebSocket WebSocket连接主处理函数

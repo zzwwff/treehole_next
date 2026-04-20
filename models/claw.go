@@ -22,8 +22,8 @@ func (ClawSession) TableName() string {
 }
 
 // GetSessionsByUserID 获取用户的所有会话
-func GetSessionsByUserID(tx *gorm.DB, userID int) ([]ClawSession, error) {
-	data := make([]ClawSession, 0)
+func GetSessionsByUserID(tx *gorm.DB, userID int) ([]*ClawSession, error) {
+	data := make([]*ClawSession, 0)
 	err := tx.Where("user_id = ?", userID).Order("created_at DESC").Find(&data).Error
 	return data, err
 }
