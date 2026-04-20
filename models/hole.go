@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -13,6 +14,7 @@ import (
 	"gorm.io/gorm/clause"
 	"gorm.io/plugin/dbresolver"
 
+	"hash/fnv"
 	"treehole_next/config"
 	"treehole_next/utils"
 )
@@ -293,6 +295,13 @@ func (holes Holes) Preprocess(c *fiber.Ctx) error {
 
 		// for users in whitelist or whitelist is empty, AISummaryAvailable is true,
 		hole.AISummaryAvailable = config.Config.WhiteListUserIds == nil || slices.Contains(config.Config.WhiteListUserIds, uid)
+		if !hole.AISummaryAvailable {
+			h := fnv.New32a()
+			h.Write([]byte(strconv.Itoa(uid)))
+			if int(h.Sum32())%100 < int(100*config.Config.WhiteListRate) {
+				hole.AISummaryAvailable = true
+			}
+		}
 		hole.AISummaryAvailable = hole.AISummaryAvailable && !(hole.Locked || hole.Hidden || hole.Frozen)
 		for _, tag := range hole.Tags {
 			if len(tag.Name) > 0 && tag.Name[0] == '*' {
