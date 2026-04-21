@@ -154,6 +154,7 @@ func HandleWebSocket(c *websocket.Conn) {
 			sendError(c, ErrCodeUnknownType, "消息格式错误", "", 0)
 			continue
 		}
+		log.Info().Msgf("[Claw] WS recv type=%s raw=%s", base.Type, string(rawMsg))
 
 		// 根据类型路由到不同处理函数
 		switch base.Type {
@@ -183,6 +184,7 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		sendError(c, ErrCodeAuthFailed, "认证消息格式错误", "", 0)
 		return
 	}
+	log.Info().Msgf("[Claw] auth received token_len=%d", len(authMsg.Token))
 
 	if authMsg.Token == "" {
 		sendError(c, ErrCodeAuthFailed, "token不能为空", "", 0)
@@ -228,7 +230,9 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 
 	if err := c.WriteJSON(resp); err != nil {
 		log.Err(err).Msgf("[Claw] Write auth_success error: %v", err)
+		return
 	}
+	log.Info().Msgf("[Claw] auth_success sent userID=%d channelCount=%d", userID, channelCount)
 }
 
 // handleMessage 处理业务消息
@@ -238,6 +242,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		sendError(c, ErrCodeUnknownType, "消息格式错误", "", 0)
 		return
 	}
+	log.Info().Msgf("[Claw] message received messageID=%s channelID=%d content_len=%d", msg.MessageID, msg.ChannelID, len(msg.Content))
 
 	// 校验必填字段
 	if msg.Content == "" {
