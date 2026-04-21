@@ -43,7 +43,7 @@ func clawtest(c *fiber.Ctx) error {
 	// Create test message
 	testMsg := ClawMessage{
 		Type:      MessageTypeMessage,
-		From:      "backend-test",
+		From:      "server",
 		Content:   "这是来自后端的测试消息",
 		MessageID: fmt.Sprintf("test-msg-%d", time.Now().UnixMilli()),
 		ChannelID: 0, // 让客户端创建新会话
