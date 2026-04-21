@@ -138,12 +138,12 @@ func GetCurrLoginUser(c *fiber.Ctx) (*User, error) {
 	user := &User{
 		BanDivision: make(map[int]*time.Time),
 	}
-	if config.Config.Mode == "dev" || config.Config.Mode == "test" {
+	/*if config.Config.Mode == "dev" || config.Config.Mode == "test" {
 		user.ID = 1
 		user.IsAdmin = true
 		user.HasAnsweredQuestions = true
 		return user, nil
-	}
+	}*/
 
 	if c.Locals("user") != nil {
 		return c.Locals("user").(*User), nil

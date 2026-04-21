@@ -21,4 +21,5 @@ func RegisterRoutes(app fiber.Router) {
     app.Get("/claw/ws", websocket.New(HandleWebSocket))
 	app.Post("/claw/test", clawtest)
     app.Get("/claw/channels", ListChannels)
+    app.Get("/claw/messages", ListMessages)
 }

@@ -154,6 +154,7 @@ func InitDB() {
 		&FavoriteGroup{},
 		&UrlHostnameBlacklist{},
 		&ClawSession{},
+		&ClawMessage{},
 	)
 	if err != nil {
 		log.Fatal().Err(err).Send()

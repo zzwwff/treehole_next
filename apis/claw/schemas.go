@@ -44,16 +44,16 @@ type ErrorMessage struct {
 type Media struct{}
 
 // ClawMessage 业务消息
-type ClawMessage struct {
-    Type      string      `json:"type"`
-    From      string      `json:"from"`
-    Content   string      `json:"content"`
-    MessageID string      `json:"message_id"`
-    ChannelID int         `json:"channel_id"`
-    Timestamp int64       `json:"timestamp"`
-    Media     Media       `json:"media"`
-    Version   string      `json:"version,omitempty"`
+// ClawMessage 在models中定义
+
+
+type ListClawMessageModel struct {
+    ChannelID int   `json:"channel_id" query:"channel_id" validate:"required,min=1"`
+	Size    int   `json:"size" query:"size" default:"30" validate:"omitempty,min=0"`
+	Offset  int    `json:"offset" query:"offset" default:"0" validate:"min=0"`
+	Sort    string `json:"sort" query:"sort" default:"desc" validate:"oneof=asc desc"`       // Sort order
 }
+
 
 // PingMessage 心跳请求
 type PingMessage struct {

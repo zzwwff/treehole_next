@@ -61,7 +61,7 @@ func ListChannels(c *fiber.Ctx) error {
 		return err
 	}
 
-	sessions, err := GetSessionsByUserID(DB, user.UserID)
+	sessions, err := GetSessionsByUserID(DB, user.ID)
 	if err != nil {
 		log.Err(err).Msg("[Claw] get sessions failed")
 		return common.BadRequest("获取对话列表失败")
@@ -74,6 +74,52 @@ func ListChannels(c *fiber.Ctx) error {
 	}
 	return c.JSON(sessions)
 }
+
+
+
+// ListMessages
+//
+// @Summary List Users' all messages in a specific channel
+// @Tags Claw
+// @Produce application/json
+// @Router /claw/messages [get]
+// @Param object query ListClawMessageModel false "query"
+// @Success 200 {array} ClawMessage
+func ListMessages(c *fiber.Ctx) error {
+	// get user
+	user, err := GetCurrLoginUser(c)
+	if err != nil {
+		return err
+	}
+	var query ListClawMessageModel
+	err = common.ValidateQuery(c, &query)
+	if err != nil {
+		return err
+	}
+
+	// 校验频道归属
+	_, err = GetSessionByUserAndSessionID(DB, user.ID, query.ChannelID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return common.NotFound("会话不存在")
+		}
+		log.Err(err).Msg("[Claw] get session failed")
+		return common.BadRequest("获取会话信息失败")
+	}
+
+	// 获取消息列表
+	if query.Size == 0 {
+		query.Size = 30
+	}
+	messages, err := GetMessagesByChannelID(DB, query.ChannelID, query.Size, query.Offset, query.Sort)
+	if err != nil {
+		log.Err(err).Msg("[Claw] get messages failed")
+		return common.BadRequest("获取消息列表失败")
+	}
+
+	return c.JSON(messages)
+}
+
 
 // HandleWebSocket WebSocket连接主处理函数
 func HandleWebSocket(c *websocket.Conn) {
@@ -126,6 +172,9 @@ func HandleWebSocket(c *websocket.Conn) {
 		}
 	}
 }
+
+
+
 
 // handleAuth 处理认证请求
 func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
@@ -227,17 +276,27 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		channelID = msg.ChannelID
 	}
 
-	//TO DO: 实际业务逻辑
-	// 暂时直接返回 hello world
+	// 保存消息到数据库
+	msg.From = fmt.Sprintf("user")
+	msg.ChannelID = channelID
+	msg.Timestamp = time.Now().UnixMilli()
+	msg.Version = "1.0"
+	if err := CreateMessage(DB, &msg); err != nil {
+		log.Err(err).Msg("[Claw] create message failed")
+		sendError(c, ErrCodeInternal, "保存消息失败", msg.MessageID, channelID)
+		return
+	}
+
+	// 返回存储后的消息
 	resp := ClawMessage{
 		Type:      MessageTypeMessage,
-		From:      "server",
-		Content:   "hello world",
-		MessageID: msg.MessageID, // 回传客户端的消息ID
+		From:      msg.From,
+		Content:   msg.Content,
+		MessageID: msg.MessageID,
 		ChannelID: channelID,
-		Timestamp: time.Now().UnixMilli(),
-		Media:     Media{},
-		Version:   "1.0",
+		Timestamp: msg.Timestamp,
+		Media:     msg.Media,
+		Version:   msg.Version,
 	}
 
 	if err := c.WriteJSON(resp); err != nil {

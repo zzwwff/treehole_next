@@ -17,8 +17,27 @@ type ClawSession struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type ClawMessage struct {
+	ID        uint           `json:"id" gorm:"primaryKey"`
+	Type      string         `json:"type" gorm:"size:32;index"`
+	From      string         `json:"from" gorm:"size:64"`
+	Content   string         `json:"content" gorm:"type:text;not null"`
+	MessageID string         `json:"message_id" gorm:"type:varchar(191);index"`
+	ChannelID int            `json:"channel_id" gorm:"index"`
+	Timestamp int64          `json:"timestamp"`
+	Media     any            `json:"media" gorm:"serializer:json"`
+	Version   string         `json:"version,omitempty" gorm:"size:32"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
 func (ClawSession) TableName() string {
 	return "claw_session"
+}
+
+func (ClawMessage) TableName() string {
+	return "claw_message"
 }
 
 // GetSessionsByUserID 获取用户的所有会话
@@ -98,6 +117,26 @@ func UpdateSession(tx *gorm.DB, id int, conversation string) error {
 // DeleteSession 删除会话
 func DeleteSession(tx *gorm.DB, id int) error {
 	return tx.Where("id = ?", id).Delete(&ClawSession{}).Error
+}
+
+// GetMessagesByChannelID 获取指定频道的消息，支持分页和排序
+func GetMessagesByChannelID(tx *gorm.DB, channelID int, size, offset int, sort string) ([]*ClawMessage, error) {
+	data := make([]*ClawMessage, 0)
+	order := "created_at DESC"
+	if sort == "asc" {
+		order = "created_at ASC"
+	}
+	query := tx.Where("channel_id = ?", channelID).Order(order)
+	if size > 0 {
+		query = query.Limit(size).Offset(offset)
+	}
+	err := query.Find(&data).Error
+	return data, err
+}
+
+// CreateMessage 创建消息记录
+func CreateMessage(tx *gorm.DB, msg *ClawMessage) error {
+	return tx.Create(msg).Error
 }
 
 // GetOrCreateSession 获取或创建会话（你说的"不存在则新建"）
