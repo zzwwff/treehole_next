@@ -9,7 +9,7 @@ import (
 	"github.com/opentreehole/go-common"
 
 	. "treehole_next/models"
-	
+
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -75,8 +75,6 @@ func ListChannels(c *fiber.Ctx) error {
 	return c.JSON(sessions)
 }
 
-
-
 // ListMessages
 //
 // @Summary List Users' all messages in a specific channel
@@ -119,7 +117,6 @@ func ListMessages(c *fiber.Ctx) error {
 
 	return c.JSON(messages)
 }
-
 
 // HandleWebSocket WebSocket连接主处理函数
 func HandleWebSocket(c *websocket.Conn) {
@@ -173,9 +170,6 @@ func HandleWebSocket(c *websocket.Conn) {
 		}
 	}
 }
-
-
-
 
 // handleAuth 处理认证请求
 func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
@@ -232,7 +226,7 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		log.Err(err).Msgf("[Claw] Write auth_success error: %v", err)
 		return
 	}
-	log.Info().Msgf("[Claw] auth_success sent userID=%d channelCount=%d", userID, channelCount)
+	log.Info().Msgf("[Claw] auth_success sent userID=%d channelCount=%d", user.ID, count)
 }
 
 // handleMessage 处理业务消息
