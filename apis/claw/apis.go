@@ -26,13 +26,6 @@ import (
 // @Param json body OpenClawTest true "json"
 // @Failure 400 {object} MessageModel
 func clawtest(c *fiber.Ctx) error {
-	// validate body
-	var body OpenClawTest
-	err := common.ValidateBody(c, &body)
-	if err != nil {
-		return err
-	}
-
 	// get user
 	user, err := GetCurrLoginUser(c)
 	if err != nil {
@@ -44,7 +37,43 @@ func clawtest(c *fiber.Ctx) error {
 		return common.Forbidden()
 	}
 
-	return common.BadRequest("The path forward is leaved for further exploration.")
+	// Get all connected clients
+	mgr := GetManager()
+
+	// Create test message
+	testMsg := ClawMessage{
+		Type:      MessageTypeMessage,
+		From:      "backend-test",
+		Content:   "这是来自后端的测试消息",
+		MessageID: fmt.Sprintf("test-msg-%d", time.Now().UnixMilli()),
+		ChannelID: 0, // 让客户端创建新会话
+		Timestamp: time.Now().UnixMilli(),
+	}
+
+	// Send to all authenticated clients
+	mgr.mu.RLock()
+	clientCount := 0
+	for _, client := range mgr.clients {
+		if client.IsAuthed {
+			client.mu.Lock()
+			err := client.Conn.WriteJSON(testMsg)
+			client.mu.Unlock()
+
+			if err != nil {
+				log.Err(err).Msgf("[Claw] Send test message to user %d failed", client.UserID)
+			} else {
+				log.Info().Msgf("[Claw] Test message sent to user %d", client.UserID)
+				clientCount++
+			}
+		}
+	}
+	mgr.mu.RUnlock()
+
+	return c.JSON(fiber.Map{
+		"success":       true,
+		"clients_count": clientCount,
+		"message":       "Test message sent",
+	})
 }
 
 // ListChannels
