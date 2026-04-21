@@ -52,6 +52,11 @@ func RegisterRoutes(app *fiber.App) {
 }
 
 func MiddlewareGetUser(c *fiber.Ctx) error {
+	if c.Path() == "/api/claw/ws" && c.Get("Upgrade") == "websocket" {
+        log.Info().Msg("WebSocket 握手，跳过中间件认证")
+        return c.Next()
+    }
+
 	userObject, err := models.GetCurrLoginUser(c)
 	if err != nil {
 		return err

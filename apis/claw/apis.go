@@ -276,7 +276,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		channelID = msg.ChannelID
 	}
 
-	// 保存消息到数据库
+	// 保存用户消息到数据库
 	msg.From = fmt.Sprintf("user")
 	msg.ChannelID = channelID
 	msg.Timestamp = time.Now().UnixMilli()
@@ -287,21 +287,33 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		return
 	}
 
-	// 返回存储后的消息
-	resp := ClawMessage{
-		Type:      MessageTypeMessage,
-		From:      msg.From,
-		Content:   msg.Content,
-		MessageID: msg.MessageID,
-		ChannelID: channelID,
-		Timestamp: msg.Timestamp,
-		Media:     msg.Media,
-		Version:   msg.Version,
+	// 返回用户消息
+	if err := c.WriteJSON(msg); err != nil {
+		log.Err(err).Msgf("[Claw] Write user message error: %v", err)
+		sendError(c, ErrCodeInternal, "发送消息失败", msg.MessageID, channelID)
+		return
 	}
 
-	if err := c.WriteJSON(resp); err != nil {
-		log.Err(err).Msgf("[Claw] Write message error: %v", err)
-		sendError(c, ErrCodeInternal, "发送消息失败", msg.MessageID, channelID)
+	// 生成 hello world 回复并落库
+	replyMsg := ClawMessage{
+		Type:      MessageTypeMessage,
+		From:      "assistant",
+		Content:   "hello world",
+		MessageID: fmt.Sprintf("reply-%d", time.Now().UnixMilli()),
+		ChannelID: channelID,
+		Timestamp: time.Now().UnixMilli(),
+		Version:   "1.0",
+	}
+	if err := CreateMessage(DB, &replyMsg); err != nil {
+		log.Err(err).Msg("[Claw] create reply message failed")
+		sendError(c, ErrCodeInternal, "保存回复失败", replyMsg.MessageID, channelID)
+		return
+	}
+
+	// 发回复给客户端
+	if err := c.WriteJSON(replyMsg); err != nil {
+		log.Err(err).Msgf("[Claw] Write reply message error: %v", err)
+		sendError(c, ErrCodeInternal, "发送回复失败", replyMsg.MessageID, channelID)
 	}
 }
 
