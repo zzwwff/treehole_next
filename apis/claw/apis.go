@@ -9,7 +9,7 @@ import (
 	"github.com/opentreehole/go-common"
 
 	. "treehole_next/models"
-	
+
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -26,13 +26,6 @@ import (
 // @Param json body OpenClawTest true "json"
 // @Failure 400 {object} MessageModel
 func clawtest(c *fiber.Ctx) error {
-	// validate body
-	var body OpenClawTest
-	err := common.ValidateBody(c, &body)
-	if err != nil {
-		return err
-	}
-
 	// get user
 	user, err := GetCurrLoginUser(c)
 	if err != nil {
@@ -44,7 +37,43 @@ func clawtest(c *fiber.Ctx) error {
 		return common.Forbidden()
 	}
 
-	return common.BadRequest("The path forward is leaved for further exploration.")
+	// Get all connected clients
+	mgr := GetManager()
+
+	// Create test message
+	testMsg := ClawMessage{
+		Type:      MessageTypeMessage,
+		From:      "server",
+		Content:   "这是来自后端的测试消息",
+		MessageID: fmt.Sprintf("test-msg-%d", time.Now().UnixMilli()),
+		ChannelID: 0, // 让客户端创建新会话
+		Timestamp: time.Now().UnixMilli(),
+	}
+
+	// Send to all authenticated clients
+	mgr.mu.RLock()
+	clientCount := 0
+	for _, client := range mgr.clients {
+		if client.IsAuthed {
+			client.mu.Lock()
+			err := client.Conn.WriteJSON(testMsg)
+			client.mu.Unlock()
+
+			if err != nil {
+				log.Err(err).Msgf("[Claw] Send test message to user %d failed", client.UserID)
+			} else {
+				log.Info().Msgf("[Claw] Test message sent to user %d", client.UserID)
+				clientCount++
+			}
+		}
+	}
+	mgr.mu.RUnlock()
+
+	return c.JSON(fiber.Map{
+		"success":       true,
+		"clients_count": clientCount,
+		"message":       "Test message sent",
+	})
 }
 
 // ListChannels
@@ -74,8 +103,6 @@ func ListChannels(c *fiber.Ctx) error {
 	}
 	return c.JSON(sessions)
 }
-
-
 
 // ListMessages
 //
@@ -125,7 +152,6 @@ func ListMessages(c *fiber.Ctx) error {
 	return c.JSON(messages)
 }
 
-
 // HandleWebSocket WebSocket连接主处理函数
 func HandleWebSocket(c *websocket.Conn) {
 	mgr := GetManager()
@@ -159,6 +185,7 @@ func HandleWebSocket(c *websocket.Conn) {
 			sendError(c, ErrCodeUnknownType, "消息格式错误", "", 0)
 			continue
 		}
+		log.Info().Msgf("[Claw] WS recv type=%s raw=%s", base.Type, string(rawMsg))
 
 		// 根据类型路由到不同处理函数
 		switch base.Type {
@@ -178,9 +205,6 @@ func HandleWebSocket(c *websocket.Conn) {
 	}
 }
 
-
-
-
 // handleAuth 处理认证请求
 func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 	var authMsg AuthMessage
@@ -188,6 +212,7 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		sendError(c, ErrCodeAuthFailed, "认证消息格式错误", "", 0)
 		return
 	}
+	log.Info().Msgf("[Claw] auth received token_len=%d", len(authMsg.Token))
 
 	if authMsg.Token == "" {
 		sendError(c, ErrCodeAuthFailed, "token不能为空", "", 0)
@@ -233,7 +258,9 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 
 	if err := c.WriteJSON(resp); err != nil {
 		log.Err(err).Msgf("[Claw] Write auth_success error: %v", err)
+		return
 	}
+	log.Info().Msgf("[Claw] auth_success sent userID=%d channelCount=%d", user.ID, count)
 }
 
 // handleMessage 处理业务消息
@@ -243,6 +270,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		sendError(c, ErrCodeUnknownType, "消息格式错误", "", 0)
 		return
 	}
+	log.Info().Msgf("[Claw] message received messageID=%s channelID=%d content_len=%d", msg.MessageID, msg.ChannelID, len(msg.Content))
 
 	// 校验必填字段
 	if msg.Content == "" {
