@@ -117,6 +117,11 @@ func ListMessages(c *fiber.Ctx) error {
 		return common.BadRequest("获取消息列表失败")
 	}
 
+	//洗掉ID数据
+	for _, message := range messages {
+		(*message).ID = 0
+	}
+
 	return c.JSON(messages)
 }
 
