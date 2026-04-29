@@ -17,10 +17,12 @@ type Client struct {
 }
 
 // Manager WebSocket连接管理器，管理所有活跃连接
+// Manager WebSocket连接管理器，管理所有活跃连接，并按 userID 建立索引便于快速查找
 type Manager struct {
-    clients     map[*websocket.Conn]*Client
-    mu          sync.RWMutex
-    pingInterval time.Duration
+    clients       map[*websocket.Conn]*Client
+    clientsByUser map[int]map[*websocket.Conn]*Client
+    mu            sync.RWMutex
+    pingInterval  time.Duration
 }
 
 var (
@@ -32,8 +34,9 @@ var (
 func GetManager() *Manager {
     mgrInitOnce.Do(func() {
         mgrInstance = &Manager{
-            clients:      make(map[*websocket.Conn]*Client),
-            pingInterval: 3 * time.Minute,
+            clients:       make(map[*websocket.Conn]*Client),
+            clientsByUser: make(map[int]map[*websocket.Conn]*Client),
+            pingInterval:  3 * time.Minute,
         }
         go mgrInstance.startPingLoop()
     })
@@ -51,6 +54,19 @@ func (m *Manager) AddClient(conn *websocket.Conn, client *Client) {
 func (m *Manager) RemoveClient(conn *websocket.Conn) {
     m.mu.Lock()
     defer m.mu.Unlock()
+    cl, ok := m.clients[conn]
+    if !ok {
+        return
+    }
+    // 从 user 索引中移除
+    if cl.UserID != 0 {
+        if ucmap, ok := m.clientsByUser[cl.UserID]; ok {
+            delete(ucmap, conn)
+            if len(ucmap) == 0 {
+                delete(m.clientsByUser, cl.UserID)
+            }
+        }
+    }
     delete(m.clients, conn)
 }
 
@@ -60,6 +76,37 @@ func (m *Manager) GetClient(conn *websocket.Conn) (*Client, bool) {
     defer m.mu.RUnlock()
     client, ok := m.clients[conn]
     return client, ok
+}
+
+// RegisterUser 在客户端完成认证后调用，用于把连接加入按 userID 的索引
+func (m *Manager) RegisterUser(conn *websocket.Conn, userID int) {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+    client, ok := m.clients[conn]
+    if !ok {
+        return
+    }
+    client.UserID = userID
+    client.IsAuthed = true
+    ucmap, ok := m.clientsByUser[userID]
+    if !ok {
+        ucmap = make(map[*websocket.Conn]*Client)
+        m.clientsByUser[userID] = ucmap
+    }
+    ucmap[conn] = client
+}
+
+// GetClientsByUserID 返回指定 userID 的所有客户端
+func (m *Manager) GetClientsByUserID(userID int) []*Client {
+    m.mu.RLock()
+    defer m.mu.RUnlock()
+    res := make([]*Client, 0)
+    if ucmap, ok := m.clientsByUser[userID]; ok {
+        for _, c := range ucmap {
+            res = append(res, c)
+        }
+    }
+    return res
 }
 
 // GetClientCount 获取当前连接数

@@ -147,6 +147,8 @@ func ListMessages(c *fiber.Ctx) error {
 	//洗掉ID数据
 	for _, message := range messages {
 		(*message).ID = 0
+		// 不向前端暴露后端/网关会话 ID
+		(*message).SessionID = ""
 	}
 
 	return c.JSON(messages)
@@ -249,6 +251,10 @@ func handleAuth(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 	client.UserID = user.ID
 	client.ChannelCount = int(count)
 
+	// 注册到 Manager 的用户索引，便于后续按 userID 查找并转发
+	mgr := GetManager()
+	mgr.RegisterUser(c, user.ID)
+
 	resp := AuthSuccessMessage{
 		Type:         MessageTypeAuthSuccess,
 		Timestamp:    time.Now().UnixMilli(),
@@ -309,44 +315,90 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		channelID = msg.ChannelID
 	}
 
-	// 保存用户消息到数据库
-	msg.From = fmt.Sprintf("user")
+	// 获取会话以得到 OC 的 session id
+	session, err := GetSessionByUserAndSessionID(DB, client.UserID, channelID)
+	if err != nil {
+		log.Err(err).Msg("[Claw] get session after ensure failed")
+		sendError(c, ErrCodeInternal, "获取会话失败", msg.MessageID, channelID)
+		return
+	}
+
+	// 标注并保存用户消息到数据库（包含 task_id 与 session_id）
+	msg.From = "user"
 	msg.ChannelID = channelID
 	msg.Timestamp = time.Now().UnixMilli()
 	msg.Version = "1.0"
+	// 生成 task_id，格式包含 userID 与 channelID
+	msg.TaskID = fmt.Sprintf("task_%d_%d_%d", client.UserID, channelID, time.Now().UnixMilli())
+	// session_id 应为后端/网关的 session id
+	msg.SessionID = session.OC_SessionID
+
 	if err := CreateMessage(DB, &msg); err != nil {
 		log.Err(err).Msg("[Claw] create message failed")
 		sendError(c, ErrCodeInternal, "保存消息失败", msg.MessageID, channelID)
 		return
 	}
 
-	// 返回用户消息
-	if err := c.WriteJSON(msg); err != nil {
+	// 返回给前端的用户消息：清理 session_id
+	outMsg := msg
+	outMsg.SessionID = ""
+	if err := c.WriteJSON(outMsg); err != nil {
 		log.Err(err).Msgf("[Claw] Write user message error: %v", err)
 		sendError(c, ErrCodeInternal, "发送消息失败", msg.MessageID, channelID)
 		return
 	}
 
-	// 生成 hello world 回复并落库
-	replyMsg := ClawMessage{
-		Type:      MessageTypeMessage,
-		From:      "assistant",
-		Content:   "hello world",
-		MessageID: fmt.Sprintf("reply-%d", time.Now().UnixMilli()),
-		ChannelID: channelID,
-		Timestamp: time.Now().UnixMilli(),
-		Version:   "1.0",
-	}
-	if err := CreateMessage(DB, &replyMsg); err != nil {
-		log.Err(err).Msg("[Claw] create reply message failed")
-		sendError(c, ErrCodeInternal, "保存回复失败", replyMsg.MessageID, channelID)
+	// 如果消息以 '#' 开头，使用本地 mock 处理（不发给 OpenClaw）
+	if len(msg.Content) > 0 && msg.Content[0] == '#' {
+		replyMsg := ClawMessage{
+			Type:      MessageTypeMessage,
+			From:      "assistant",
+			Content:   "hello world",
+			MessageID: fmt.Sprintf("reply-%d", time.Now().UnixMilli()),
+			ChannelID: channelID,
+			Timestamp: time.Now().UnixMilli(),
+			Version:   "1.0",
+			TaskID:    msg.TaskID,
+			SessionID: "",
+		}
+		if err := CreateMessage(DB, &replyMsg); err != nil {
+			log.Err(err).Msg("[Claw] create reply message failed")
+			sendError(c, ErrCodeInternal, "保存回复失败", replyMsg.MessageID, channelID)
+			return
+		}
+		// 发送回复给前端
+		if err := c.WriteJSON(replyMsg); err != nil {
+			log.Err(err).Msgf("[Claw] Write reply message error: %v", err)
+			sendError(c, ErrCodeInternal, "发送回复失败", replyMsg.MessageID, channelID)
+		}
 		return
 	}
 
-	// 发回复给客户端
-	if err := c.WriteJSON(replyMsg); err != nil {
-		log.Err(err).Msgf("[Claw] Write reply message error: %v", err)
-		sendError(c, ErrCodeInternal, "发送回复失败", replyMsg.MessageID, channelID)
+	// 否则将消息发往 OpenClaw 网关（如果已连接且认证成功）
+	ocClientMu.Lock()
+	target := ocClient
+	ocClientMu.Unlock()
+
+	if target != nil && target.IsAuthed {
+		payload := map[string]interface{}{
+			"type":       MessageTypeMessage,
+			"from":       "server",
+			"content":    msg.Content,
+			"task_id":    msg.TaskID,
+			"session_id": msg.SessionID,
+			"timestamp":  msg.Timestamp,
+			"media":      map[string]interface{}{},
+			"version":    "1.0",
+		}
+		target.mu.Lock()
+		err := target.Conn.WriteJSON(payload)
+		target.mu.Unlock()
+		if err != nil {
+			log.Err(err).Msg("[Claw] send to OpenClaw failed")
+			// 不将错误返回前端，只记录日志；消息已落库
+		}
+	} else {
+		log.Warn().Msg("[Claw] no OpenClaw client connected; message saved but not forwarded")
 	}
 }
 

@@ -19,6 +19,14 @@ func RegisterRoutes(app fiber.Router) {
     })
 
     app.Get("/claw/ws", websocket.New(HandleWebSocket))
+    // WebSocket 端点: /api/claw/oc (与 /claw/ws 独立，不复用连接池或处理逻辑)
+    app.Use("/claw/oc", func(c *fiber.Ctx) error {
+        if websocket.IsWebSocketUpgrade(c) {
+            return c.Next()
+        }
+        return fiber.ErrUpgradeRequired
+    })
+    app.Get("/claw/oc", websocket.New(HandleOpenClawWebSocket))
 	app.Post("/claw/test", clawtest)
     app.Get("/claw/channels", ListChannels)
     app.Get("/claw/messages", ListMessages)

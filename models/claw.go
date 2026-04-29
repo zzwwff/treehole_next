@@ -23,6 +23,8 @@ type ClawMessage struct {
 	From      string         `json:"from" gorm:"size:64"`
 	Content   string         `json:"content" gorm:"type:text;not null"`
 	MessageID string         `json:"message_id" gorm:"type:varchar(191);index"`
+	TaskID    string         `json:"task_id,omitempty" gorm:"type:varchar(191);index"`
+	SessionID string         `json:"session_id,omitempty" gorm:"size:191;index"`
 	ChannelID int            `json:"channel_id" gorm:"index"`
 	Timestamp int64          `json:"timestamp"`
 	Media     any            `json:"media" gorm:"serializer:json"`
