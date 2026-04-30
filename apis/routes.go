@@ -55,7 +55,9 @@ func MiddlewareGetUser(c *fiber.Ctx) error {
 	if c.Path() == "/api/claw/ws" && c.Get("Upgrade") == "websocket" {
         return c.Next()
     }
-
+	if c.Path() == "/api/claw/oc" && c.Get("Upgrade") == "websocket" {
+        return c.Next()
+    }
 	userObject, err := models.GetCurrLoginUser(c)
 	if err != nil {
 		return err

@@ -339,20 +339,11 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		return
 	}
 
-	// 返回给前端的用户消息：清理 session_id
-	outMsg := msg
-	outMsg.SessionID = ""
-	if err := c.WriteJSON(outMsg); err != nil {
-		log.Err(err).Msgf("[Claw] Write user message error: %v", err)
-		sendError(c, ErrCodeInternal, "发送消息失败", msg.MessageID, channelID)
-		return
-	}
-
 	// 如果消息以 '#' 开头，使用本地 mock 处理（不发给 OpenClaw）
 	if len(msg.Content) > 0 && msg.Content[0] == '#' {
 		replyMsg := ClawMessage{
 			Type:      MessageTypeMessage,
-			From:      "assistant",
+			From:      "mock_openclaw",
 			Content:   "hello world",
 			MessageID: fmt.Sprintf("reply-%d", time.Now().UnixMilli()),
 			ChannelID: channelID,
@@ -382,7 +373,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 	if target != nil && target.IsAuthed {
 		payload := map[string]interface{}{
 			"type":       MessageTypeMessage,
-			"from":       "server",
+			"from":       "openclaw",
 			"content":    msg.Content,
 			"task_id":    msg.TaskID,
 			"session_id": msg.SessionID,
