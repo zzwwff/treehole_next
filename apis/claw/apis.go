@@ -3,6 +3,7 @@ package claw
 import (
 	"fmt"
 	"time"
+	"strings"
 
 	"github.com/goccy/go-json"
 
@@ -330,6 +331,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 	msg.Version = "1.0"
 	// 生成 task_id，格式包含 userID 与 channelID
 	msg.TaskID = fmt.Sprintf("task_%d_%d_%d", client.UserID, channelID, time.Now().UnixMilli())
+	log.Info().Msgf("[Claw] generated task_id=%s user=%d channel=%d", msg.TaskID, client.UserID, channelID)
 	// session_id 应为后端/网关的 session id
 	msg.SessionID = session.OC_SessionID
 
@@ -339,8 +341,9 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		return
 	}
 
-	// 如果消息以 '#' 开头，使用本地 mock 处理（不发给 OpenClaw）
-	if len(msg.Content) > 0 && msg.Content[0] == '#' {
+	// 如果消息以 '#' 开头（忽略前导空白），使用本地 mock 处理（不发给 OpenClaw）
+	trimmed := strings.TrimSpace(msg.Content)
+	if strings.HasPrefix(trimmed, "#") {
 		replyMsg := ClawMessage{
 			Type:      MessageTypeMessage,
 			From:      "mock_openclaw",
@@ -371,6 +374,11 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 	ocClientMu.Unlock()
 
 	if target != nil && target.IsAuthed {
+		if msg.TaskID == "" {
+			// 防御性补充：确保发送给 OpenClaw 时包含 task_id
+			msg.TaskID = fmt.Sprintf("task_%d_%d_%d", client.UserID, channelID, time.Now().UnixMilli())
+			log.Warn().Msgf("[Claw] task_id was empty before send; regenerated=%s", msg.TaskID)
+		}
 		payload := map[string]interface{}{
 			"type":       MessageTypeMessage,
 			"from":       "openclaw",
@@ -381,6 +389,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 			"media":      map[string]interface{}{},
 			"version":    "1.0",
 		}
+		log.Info().Msgf("[Claw] forwarding to OpenClaw task_id=%s session_id=%s content_len=%d", msg.TaskID, msg.SessionID, len(msg.Content))
 		target.mu.Lock()
 		err := target.Conn.WriteJSON(payload)
 		target.mu.Unlock()
