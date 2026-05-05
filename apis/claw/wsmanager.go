@@ -14,6 +14,7 @@ type Client struct {
     IsAuthed     bool
     ChannelCount int        // 该用户已有的对话数
     mu           sync.Mutex // 保护Conn写入
+    LastPong     int64      // 最近一次收到客户端 Pong 的时间（毫秒）
 }
 
 // Manager WebSocket连接管理器，管理所有活跃连接
@@ -48,6 +49,7 @@ func (m *Manager) AddClient(conn *websocket.Conn, client *Client) {
     m.mu.Lock()
     defer m.mu.Unlock()
     m.clients[conn] = client
+    client.LastPong = time.Now().UnixMilli()
 }
 
 // RemoveClient 移除客户端连接
@@ -132,11 +134,13 @@ func (m *Manager) startPingLoop() {
         }
         m.mu.RUnlock()
 
-        // 逐个发送ping
+        // 逐个发送ping并检查客户端是否在阈值内有响应（LastPong）
+        now := time.Now().UnixMilli()
+        staleThreshold := int64(m.pingInterval*2/time.Millisecond) // 两个 pingInterval
         for _, client := range clients {
             ping := PingMessage{
                 Type:      MessageTypePing,
-                Timestamp: time.Now().UnixMilli(),
+                Timestamp: now,
                 Version:   "1.0",
             }
             client.mu.Lock()
@@ -145,6 +149,21 @@ func (m *Manager) startPingLoop() {
 
             if err != nil {
                 // 发送失败，关闭连接并移除
+                client.Conn.Close()
+                m.RemoveClient(client.Conn)
+                continue
+            }
+
+            // 检查最后一次收到 pong 的时间
+            client.mu.Lock()
+            last := client.LastPong
+            client.mu.Unlock()
+            if last == 0 {
+                // 如果没有收到过 pong，则使用连接添加时间（已在 AddClient 初始化）
+                last = now
+            }
+            if now-last > staleThreshold {
+                // 认为客户端掉线，主动断开并移除
                 client.Conn.Close()
                 m.RemoveClient(client.Conn)
             }

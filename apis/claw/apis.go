@@ -201,7 +201,11 @@ func HandleWebSocket(c *websocket.Conn) {
 			}
 			handleMessage(c, client, rawMsg)
 		case MessageTypePong:
-			// 收到pong，无需处理，保持连接即可
+			// 收到 pong，更新客户端最后活跃时间
+			client.mu.Lock()
+			client.LastPong = time.Now().UnixMilli()
+			client.mu.Unlock()
+			log.Info().Msgf("[Claw] recv pong from conn user=%d", client.UserID)
 		default:
 			sendError(c, ErrCodeUnknownType, "未知的消息类型", "", 0)
 		}

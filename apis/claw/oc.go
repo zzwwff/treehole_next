@@ -35,6 +35,34 @@ func HandleOpenClawWebSocket(c *websocket.Conn) {
         IsAuthed: false,
     }
 
+    // 定期向 OpenClaw 网关连接发送心跳（每 30 秒）
+    pingDone := make(chan struct{})
+    go func() {
+        ticker := time.NewTicker(30 * time.Second)
+        defer ticker.Stop()
+        for {
+            select {
+            case <-ticker.C:
+                ping := PingMessage{
+                    Type:      MessageTypePing,
+                    Timestamp: time.Now().UnixMilli(),
+                    Version:   "1.0",
+                }
+                client.mu.Lock()
+                err := c.WriteJSON(ping)
+                client.mu.Unlock()
+                if err != nil {
+                    log.Err(err).Msg("[Claw-OC] send ping failed; closing oc connection")
+                    // 发送失败，主动关闭连接以触发上层清理
+                    _ = c.Close()
+                    return
+                }
+            case <-pingDone:
+                return
+            }
+        }
+    }()
+
     defer func() {
         // 清理全局引用（如果是当前连接）
         ocClientMu.Lock()
@@ -42,6 +70,8 @@ func HandleOpenClawWebSocket(c *websocket.Conn) {
             ocClient = nil
         }
         ocClientMu.Unlock()
+        // 停止 ping 协程并关闭连接
+        close(pingDone)
         c.Close()
     }()
 
