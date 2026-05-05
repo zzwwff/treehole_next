@@ -385,7 +385,7 @@ func handleMessage(c *websocket.Conn, client *Client, rawMsg json.RawMessage) {
 		}
 		payload := map[string]interface{}{
 			"type":       MessageTypeMessage,
-			"from":       "openclaw",
+			"from":       "server",
 			"content":    msg.Content,
 			"task_id":    msg.TaskID,
 			"session_id": msg.SessionID,
