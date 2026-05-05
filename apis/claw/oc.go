@@ -21,6 +21,7 @@ type OcClient struct {
     UserID   int
     IsAuthed bool
     mu       sync.Mutex
+    LastPong int64
 }
 
 var (
@@ -33,6 +34,7 @@ func HandleOpenClawWebSocket(c *websocket.Conn) {
     client := &OcClient{
         Conn:     c,
         IsAuthed: false,
+        LastPong: time.Now().UnixMilli(),
     }
 
     // 定期向 OpenClaw 网关连接发送心跳（每 30 秒）
@@ -110,6 +112,14 @@ func HandleOpenClawWebSocket(c *websocket.Conn) {
                 client.mu.Lock()
                 _ = c.WriteJSON(pong)
                 client.mu.Unlock()
+            }
+        case MessageTypePong:
+            var pong PongMessage
+            if err := json.Unmarshal(rawMsg, &pong); err == nil {
+                client.mu.Lock()
+                client.LastPong = time.Now().UnixMilli()
+                client.mu.Unlock()
+                log.Info().Msgf("[Claw-OC] recv pong timestamp=%d", pong.Timestamp)
             }
         default:
             sendOcError(c, ErrCodeUnknownType, "未知的消息类型", "", "")
