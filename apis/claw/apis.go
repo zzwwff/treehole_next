@@ -3,6 +3,7 @@ package claw
 import (
 	"fmt"
 	"time"
+	"math/rand"
 	"strings"
 
 	"github.com/goccy/go-json"
@@ -38,43 +39,53 @@ func clawtest(c *fiber.Ctx) error {
 		return common.Forbidden()
 	}
 
-	// Get all connected clients
-	mgr := GetManager()
-
-	// Create test message
-	testMsg := ClawMessage{
-		Type:      MessageTypeMessage,
-		From:      "server",
-		Content:   "这是来自后端的测试消息",
-		MessageID: fmt.Sprintf("test-msg-%d", time.Now().UnixMilli()),
-		ChannelID: 0, // 让客户端创建新会话
-		Timestamp: time.Now().UnixMilli(),
+	// Ten domain-spanning questions, pick one randomly
+	greetings := []string{
+		"1+1 等于几？",
+		"地球为什么会有昼夜？",
+		"为什么树叶会变黄？",
+		"水的沸点是多少摄氏度？",
+		"光速大约是多少米每秒？",
+		"天空为什么是蓝色的？",
+		"计算机是如何运行程序的？",
+		"中国的首都是哪座城市？",
+		"互联网是如何把信息传到全世界的？",
+		"为什么人会做梦？",
 	}
 
-	// Send to all authenticated clients
-	mgr.mu.RLock()
-	clientCount := 0
-	for _, client := range mgr.clients {
-		if client.IsAuthed {
-			client.mu.Lock()
-			err := client.Conn.WriteJSON(testMsg)
-			client.mu.Unlock()
+	rand.Seed(time.Now().UnixNano())
+	content := greetings[rand.Intn(len(greetings))]
 
-			if err != nil {
-				log.Err(err).Msgf("[Claw] Send test message to user %d failed", client.UserID)
-			} else {
-				log.Info().Msgf("[Claw] Test message sent to user %d", client.UserID)
-				clientCount++
-			}
+	// Build payload similar to handleMessage forwarding
+	payload := map[string]interface{}{
+		"type":       MessageTypeMessage,
+		"from":       "server",
+		"content":    content,
+		"task_id":    fmt.Sprintf("test-%d", time.Now().UnixMilli()),
+		"session_id": "1", // use session '1' as requested
+		"timestamp":  time.Now().UnixMilli(),
+		"media":      map[string]interface{}{},
+		"version":    "1.0",
+	}
+
+	// Forward to OpenClaw gateway if connected and authed
+	ocClientMu.Lock()
+	target := ocClient
+	ocClientMu.Unlock()
+
+	if target != nil && target.IsAuthed {
+		target.mu.Lock()
+		err := target.Conn.WriteJSON(payload)
+		target.mu.Unlock()
+		if err != nil {
+			log.Err(err).Msg("[Claw] send test to OpenClaw failed")
+			return c.JSON(fiber.Map{"success": false, "error": "send_failed"})
 		}
+		return c.JSON(fiber.Map{"success": true, "sent": true, "content": content})
 	}
-	mgr.mu.RUnlock()
 
-	return c.JSON(fiber.Map{
-		"success":       true,
-		"clients_count": clientCount,
-		"message":       "Test message sent",
-	})
+	log.Warn().Msg("[Claw] no OpenClaw client connected; not forwarded")
+	return c.JSON(fiber.Map{"success": false, "error": "no_openclaw"})
 }
 
 // ListChannels
